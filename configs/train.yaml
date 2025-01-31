@@ -1,0 +1,83 @@
+# Training configuration
+
+# Hydra configuration
+hydra:
+  run:
+    dir: .  # Keep the original working directory
+  job:
+    chdir: false  # Don't change working directory
+
+# Random seed for reproducibility
+seed: 42
+
+# Weights & Biases logging configuration
+wandb:
+  project: "doc-rotation"  # Project name
+  run_name: "${now:%Y-%m-%d_%H-%M-%S}"  # Automatic timestamp for run name with 8-class prefix
+
+# File paths
+paths:
+  output_dir: "outputs/${wandb.run_name}"  # Output directory for logs and checkpoints
+  checkpoint_dir: "${paths.output_dir}/checkpoints"  # Directory for model checkpoints
+  export_dir: "${paths.output_dir}/exported"  # Directory for exported models
+
+# Checkpoint configuration
+checkpoint:
+  save_top_k: 3  # Number of best models to save
+  save_last: true  # Whether to save the last model
+  every_n_epochs: 1  # Save checkpoint every N epochs
+  filename: "rotation-model-{epoch:03d}-{val/accuracy:.4f}"  # Checkpoint filename pattern
+
+# Export configuration
+export:
+  onnx:
+    enabled: true  # Whether to export to ONNX
+    input_shape: [1, 3, 384, 384]  # Input shape for ONNX export (batch_size, channels, height, width)
+    opset_version: 17  # ONNX opset version
+  state_dict:
+    enabled: true  # Whether to save state dict
+    save_optimizer: true  # Whether to save optimizer state
+
+# Hardware configuration
+hardware:
+  accelerator: "gpu"  # auto, cpu, gpu, tpu, etc.
+  devices: 1  # Number of devices to use
+  precision: 16  # 16, 32, or 64-bit precision
+
+# Model configuration
+model:
+  learning_rate: 1e-3
+  weight_decay: 1e-4
+  num_classes: 8 
+  scheduler:
+    name: "cosine_warm_restarts"  # Type of scheduler
+    T_0: 10  # First restart period (epochs)
+    T_mult: 2  # Period multiplier after each restart
+    eta_min: 1e-6  # Minimum learning rate
+    interval: "step"  # Update frequency (step or epoch)
+
+# Training configuration
+training:
+  max_epochs: 100
+  early_stop_patience: 15
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 2
+  val_check_interval: 10 
+  log_every_n_steps: 1
+
+# Data configuration
+data:
+  batch_size: 128
+  num_workers: 8
+  image_size: 384
+  train_datasets:  # Use all datasets for training
+    - "rvl-cdip"     # Document classification dataset
+    - "publaynet"    # Scientific papers
+    - "midv500"      # ID documents
+    - "sroie"        # Receipts
+  val_datasets:  # Use all datasets for validation
+    - "rvl-cdip"
+    - "publaynet"
+    - "midv500"
+    - "sroie"
+  test_datasets: []  # No separate test set, using validation as hold-out

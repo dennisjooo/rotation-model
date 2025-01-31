@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+env/
+.env
+
+# Data
+data/
+outputs/
+logs/
+wandb/
+
+# Credentials
+kaggle.json
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
