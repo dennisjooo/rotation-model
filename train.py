@@ -262,6 +262,8 @@ def train(cfg: DictConfig) -> None:
         val_datasets=cfg.data.val_datasets,
         test_datasets=cfg.data.test_datasets if cfg.data.test_datasets != [] else None,
         image_size=cfg.data.image_size,
+        persistent_workers=cfg.data.persistent_workers,
+        prefetch_factor=cfg.data.prefetch_factor
     )
     
     # Log dataset sizes and configuration

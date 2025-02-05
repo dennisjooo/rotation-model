@@ -50,6 +50,8 @@ def create_dataloaders(
     image_size: int = 384,
     val_split: float = 0.1,
     random_seed: int = 42,
+    persistent_workers: bool = True,
+    prefetch_factor: int = 2
 ) -> Tuple[DataLoader, DataLoader, Optional[DataLoader]]:
     """Create training, validation, and test dataloaders.
     
@@ -62,6 +64,8 @@ def create_dataloaders(
         image_size: Target image size
         val_split: Fraction of data to use for validation
         random_seed: Random seed for reproducible splits
+        persistent_workers: Whether to maintain worker processes between iterations
+        prefetch_factor: Number of batches to prefetch per worker
         
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
@@ -118,8 +122,10 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=False,
         drop_last=True,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor
     )
     
     val_loader = DataLoader(
@@ -127,7 +133,9 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=False,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor
     )
     
     test_loader = None
@@ -137,7 +145,9 @@ def create_dataloaders(
             batch_size=batch_size,
             shuffle=False,
             num_workers=num_workers,
-            pin_memory=True,
+            pin_memory=False,
+            persistent_workers=persistent_workers,
+            prefetch_factor=prefetch_factor
         )
     
     return train_loader, val_loader, test_loader 

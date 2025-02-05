@@ -26,21 +26,21 @@ def get_train_transforms(image_size: int = 384) -> A.Compose:
             A.GaussNoise(var_limit=50.0),
             A.GaussianBlur(blur_limit=(3, 7)),
             A.MotionBlur(blur_limit=(3, 7)),
-        ], p=0.5),
+        ], p=0.25),
         A.OneOf([
             A.RandomBrightnessContrast(p=0.5),
             A.RandomGamma(),
             A.CLAHE(),
-        ], p=0.5),
+        ], p=0.25),
         A.OneOf([
             A.ImageCompression(quality_lower=50),
             A.Downscale(scale_range=(0.7, 0.9)),
-        ], p=0.3),
+        ], p=0.25),
         A.OneOf([
-            A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+            A.GaussNoise(var_limit=(10.0, 50.0), p=0.25),
             A.RandomShadow(p=0.2, shadow_roi=(0, 0.5, 1, 1)),
             A.RandomSunFlare(p=0.2),
-        ], p=0.3),
+        ], p=0.25),
         A.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],

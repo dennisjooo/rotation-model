@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
-
+import concurrent.futures
 import zipfile
 from tqdm.auto import tqdm
 
@@ -171,12 +171,44 @@ def unzip(zip_path: str | Path, dst: str | Path) -> None:
         logger.error(f"Error opening zip file {zip_path}: {str(e)}")
         raise
 
-def download_dataset(download_dir: str | Path, skip_confirmation: bool = False) -> None:
-    """Download and extract MIDV-500 dataset.
+def process_single_file(link: str, download_dir: str | Path) -> bool:
+    """Process a single dataset file - download, unzip, and cleanup.
+    
+    Args:
+        link: FTP URL to download
+        download_dir: Directory to download and extract the dataset
+        
+    Returns:
+        bool: True if processing was successful, False otherwise
+    """
+    print("\n" + "-" * 70)
+    print(f"Processing: {os.path.basename(link)}")
+    try:
+        # Download zip file
+        zip_path = download(link, download_dir)
+        if zip_path is None:
+            logger.error(f"Failed to download {link}")
+            return False
+        
+        # Unzip file
+        unzip(zip_path, download_dir)
+        
+        # Remove zip file
+        os.remove(zip_path)
+        print(f"Cleaned up {os.path.basename(zip_path)}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error processing {link}: {str(e)}")
+        return False
+
+def download_dataset(download_dir: str | Path, skip_confirmation: bool = False, max_workers: int = 4) -> None:
+    """Download and extract MIDV-500 dataset using parallel processing.
     
     Args:
         download_dir: Directory to download and extract the dataset
         skip_confirmation: Whether to skip the confirmation prompt
+        max_workers: Maximum number of concurrent downloads
     """
     # Estimate total size
     total_size = estimate_total_size(dataset_links)
@@ -192,27 +224,22 @@ def download_dataset(download_dir: str | Path, skip_confirmation: bool = False) 
     
     # Add overall progress bar for all files
     with tqdm(total=len(dataset_links), desc="Overall Progress", unit="file") as pbar:
-        for link in dataset_links:
-            print("\n" + "-" * 70)
-            print(f"Processing: {os.path.basename(link)}")
-            try:
-                # Download zip file
-                zip_path = download(link, download_dir)
-                if zip_path is None:
-                    logger.error(f"Failed to download {link}")
-                    continue
-                
-                # Unzip file
-                unzip(zip_path, download_dir)
-                
-                # Remove zip file
-                os.remove(zip_path)
-                print(f"Cleaned up {os.path.basename(zip_path)}")
-                
-                pbar.update(1)
-            except Exception as e:
-                logger.error(f"Error processing {link}: {str(e)}")
-                continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all download tasks
+            future_to_link = {
+                executor.submit(process_single_file, link, download_dir): link 
+                for link in dataset_links
+            }
+            
+            # Process completed downloads
+            for future in concurrent.futures.as_completed(future_to_link):
+                link = future_to_link[future]
+                try:
+                    success = future.result()
+                    if success:
+                        pbar.update(1)
+                except Exception as e:
+                    logger.error(f"Unexpected error processing {link}: {str(e)}")
 
 # List of selected MIDV-500 dataset files (most common document types)
 dataset_links = [
@@ -244,6 +271,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('--dir', default="data/midv500", help='Directory to download the dataset')
     parser.add_argument('--yes', '-y', action='store_true', help='Skip confirmation and proceed with download')
+    parser.add_argument('--workers', type=int, default=4, help='Number of concurrent downloads')
     args = parser.parse_args()
     
-    download_dataset(args.dir, args.yes) 
+    download_dataset(args.dir, args.yes, args.workers) 

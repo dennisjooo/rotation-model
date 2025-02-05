@@ -161,26 +161,43 @@ class BaseDocumentDataset(Dataset):
         """
         if angle == 0:
             return img
-        
-        # Store the dimensions for further calculations
+    
+        # Store the original dimensions
         h, w = img.shape[:2]
         original_size = (w, h)
+        
+        # Calculate background color (mean across all non-black pixels)
+        non_black_mask = np.any(img > 30, axis=2)
+        mean_color = np.mean(img[non_black_mask], axis=0).astype(np.uint8)
+        
+        # Blend mean color with white (0.1 mean + 0.9 white)
+        white = np.array([255, 255, 255], dtype=np.uint8)
+        bg_color = (0.1 * mean_color + 0.9 * white).astype(np.uint8)
         
         # Calculate the size needed to contain the rotated image
         diagonal = int(np.ceil(np.sqrt(h*h + w*w)))
         
-        # Create a square background with the mean color of the image
-        bg_color = np.mean(img, axis=(0, 1)).astype(np.uint8)
+        # Create a square background with the blended color
         background = np.full((diagonal, diagonal, 3), bg_color, dtype=np.uint8)
         
-        # Place the original image in the center of the background
+        # Create a mask for the document (excluding black borders)
+        # Assuming pixels with all channels < 30 are part of the black background
+        document_mask = np.any(img > 30, axis=2)
+        img_cleaned = img.copy()
+        img_cleaned[~document_mask] = bg_color  # Set black borders to blended color
+        
+        # Place the cleaned image in the center of the background
         y_offset = (diagonal - h) // 2
         x_offset = (diagonal - w) // 2
-        background[y_offset:y_offset+h, x_offset:x_offset+w] = img
+        background[y_offset:y_offset+h, x_offset:x_offset+w] = img_cleaned
         
         # Rotate around the center (with some noise as document rotation is not always perfect)
         M = cv2.getRotationMatrix2D((diagonal/2, diagonal/2), angle + self.rng.uniform(-5, 5), 1.0)
         rotated = cv2.warpAffine(background, M, (diagonal, diagonal))
+        
+        # Fill any remaining black pixels (rotation artifacts) with blended color
+        black_pixels = np.all(rotated < 30, axis=2)
+        rotated[black_pixels] = bg_color
         
         # Scale the rotated image back to original canvas size
         return cv2.resize(rotated, original_size, interpolation=cv2.INTER_LINEAR)
