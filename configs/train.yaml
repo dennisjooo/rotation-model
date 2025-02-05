@@ -46,13 +46,13 @@ hardware:
 
 # Model configuration
 model:
-  learning_rate: 1e-3
+  learning_rate: 5e-4
   weight_decay: 1e-4
   num_classes: 8 
   scheduler:
     name: "cosine_warm_restarts"  # Type of scheduler
-    T_0: 10  # First restart period (epochs)
-    T_mult: 2  # Period multiplier after each restart
+    T_0: 15  # First restart period (epochs)
+    T_mult: 1.5  # Period multiplier after each restart
     eta_min: 1e-6  # Minimum learning rate
     interval: "step"  # Update frequency (step or epoch)
 
@@ -61,7 +61,7 @@ training:
   max_epochs: 100
   early_stop_patience: 15
   gradient_clip_val: 1.0
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 4
   val_check_interval: 0.5
   log_every_n_steps: 2
 
