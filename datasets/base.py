@@ -211,7 +211,7 @@ class BaseDocumentDataset(Dataset):
         Returns:
             Dictionary containing:
                 - image: Tensor of shape (3, H, W)
-                - rotation: Integer rotation class (0-15)
+                - rotation: Integer rotation class (0-7)
                 - rotation_angle: Actual rotation angle in degrees
                 - path: Path to the image file
         """
