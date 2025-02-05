@@ -114,22 +114,33 @@ class DocRotationLightning(pl.LightningModule):
         accuracy = getattr(self, f"{stage}_accuracy")
         accuracy(logits, y)
         
-        # Classification loss
-        cls_loss = F.cross_entropy(logits, y)
+        # Classification loss with label smoothing
+        cls_loss = F.cross_entropy(logits, y, label_smoothing=0.1)
         
-        # Confidence loss (higher confidence for correct predictions)
+        # Confidence loss with focal-like weighting
         pred = torch.argmax(logits, dim=1)
         confidence_target = (pred == y).float()
-        confidence_loss = F.binary_cross_entropy_with_logits(confidence.squeeze(), confidence_target)
+        confidence_pred = torch.sigmoid(confidence.squeeze())
         
-        # Combined loss
-        loss = cls_loss + 0.2 * confidence_loss
+        # Weight confidence loss based on prediction certainty
+        confidence_weights = torch.abs(confidence_target - confidence_pred).detach()
+        confidence_loss = F.binary_cross_entropy_with_logits(
+            confidence.squeeze(), 
+            confidence_target,
+            reduction='none'
+        )
+        confidence_loss = (confidence_weights * confidence_loss).mean()
         
-        # Log metrics
-        on_step = stage == "train"  # Only log steps during training
-        batch_size = x.size(0)  # Get actual batch size from input tensor
-        self.log(f"{stage}/loss", loss, on_step=on_step, on_epoch=True, prog_bar=True, batch_size=batch_size)
-        self.log(f"{stage}/accuracy", accuracy, on_step=on_step, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        # Adaptive loss weighting
+        confidence_weight = 0.1 if stage == "train" else 0.05
+        loss = cls_loss + confidence_weight * confidence_loss
+        
+        # Log detailed metrics
+        batch_size = x.size(0)
+        self.log(f"{stage}/cls_loss", cls_loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        self.log(f"{stage}/conf_loss", confidence_loss, on_step=True, on_epoch=True, prog_bar=False, batch_size=batch_size)
+        self.log(f"{stage}/loss", loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        self.log(f"{stage}/accuracy", accuracy, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
         
         return {
             "loss": loss, 

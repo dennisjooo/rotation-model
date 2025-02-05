@@ -149,131 +149,132 @@ class BaseDocumentDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
     
-    def _get_background_color(self, img: np.ndarray, train_mode: bool) -> np.ndarray:
-        """Calculate background color with optional randomization.
+    def _calculate_background_color(self, img: np.ndarray) -> np.ndarray:
+        """Calculate background color by blending mean document color with white.
         
         Args:
-            img: Input image
-            train_mode: Whether to apply randomization
+            img: Input image array of shape (H, W, C)
             
         Returns:
-            Background color as uint8 RGB array
+            Background color as RGB array
         """
         # Calculate mean color of non-black pixels
         non_black_mask = np.any(img > 30, axis=2)
         mean_color = np.mean(img[non_black_mask], axis=0).astype(np.uint8)
+        
+        # Blend with white (10% mean + 90% white)
         white = np.array([255, 255, 255], dtype=np.uint8)
-        
-        if train_mode:
-            # Randomized blend
-            random_factor = self.rng.uniform(0.05, 0.15)
-            return ((random_factor * mean_color + (1 - random_factor) * white) * 
-                    self.rng.uniform(0.95, 1.05)).clip(0, 255).astype(np.uint8)
-        else:
-            # Fixed blend for validation
-            return (0.1 * mean_color + 0.9 * white).astype(np.uint8)
+        return (0.1 * mean_color + 0.9 * white).astype(np.uint8)
     
-    def _create_background(self, size: tuple[int, int], bg_color: np.ndarray, train_mode: bool) -> np.ndarray:
-        """Create background canvas with optional noise.
+    def _clean_document_borders(self, img: np.ndarray, bg_color: np.ndarray) -> np.ndarray:
+        """Replace black borders with background color.
         
         Args:
-            size: (height, width) of background
-            bg_color: Background color as RGB array
-            train_mode: Whether to apply noise
+            img: Input image array
+            bg_color: Background color to use for borders
             
         Returns:
-            Background array of shape (height, width, 3)
+            Cleaned image with black borders replaced
         """
-        background = np.full((*size, 3), bg_color, dtype=np.uint8)
-        if train_mode:
-            noise = np.random.normal(0, 2, background.shape).astype(np.uint8)
-            background = cv2.add(background, noise)
-        return background
-    
-    def _clean_document_edges(self, img: np.ndarray, bg_color: np.ndarray, train_mode: bool) -> np.ndarray:
-        """Clean document edges by replacing black borders with background color.
-        
-        Args:
-            img: Input image
-            bg_color: Background color to use
-            train_mode: Whether to use random threshold
-            
-        Returns:
-            Cleaned image
-        """
-        threshold = self.rng.randint(25, 35) if train_mode else 30
-        document_mask = np.any(img > threshold, axis=2)
+        document_mask = np.any(img > 30, axis=2)
         img_cleaned = img.copy()
         img_cleaned[~document_mask] = bg_color
         return img_cleaned
     
-    def _get_placement_offsets(self, img_size: tuple[int, int], canvas_size: tuple[int, int], train_mode: bool) -> tuple[int, int]:
-        """Calculate placement offsets with optional jitter.
+    def _create_padded_background(
+        self, 
+        img: np.ndarray, 
+        bg_color: np.ndarray
+    ) -> Tuple[np.ndarray, Tuple[int, int], Tuple[int, int]]:
+        """Create padded background and calculate placement offsets.
         
         Args:
-            img_size: (height, width) of image
-            canvas_size: (height, width) of canvas
-            train_mode: Whether to apply random jitter
+            img: Input image array
+            bg_color: Background color to use
             
         Returns:
-            (y_offset, x_offset) tuple
+            Tuple of:
+                - Padded background array
+                - Original dimensions (h, w)
+                - Offset coordinates (y_offset, x_offset)
         """
-        h, w = img_size
-        canvas_h, canvas_w = canvas_size
+        h, w = img.shape[:2]
+        diagonal = int(np.ceil(np.sqrt(h*h + w*w)))
         
-        y_offset = (canvas_h - h) // 2
-        x_offset = (canvas_w - w) // 2
+        # Create square background
+        background = np.full((diagonal, diagonal, 3), bg_color, dtype=np.uint8)
         
-        if train_mode:
-            y_offset += self.rng.randint(-5, 5)
-            x_offset += self.rng.randint(-5, 5)
-            
-        return y_offset, x_offset
+        # Calculate center offsets
+        y_offset = (diagonal - h) // 2
+        x_offset = (diagonal - w) // 2
+        
+        return background, (h, w), (y_offset, x_offset)
     
-    def _rotate_with_background(self, img: np.ndarray, angle: float, train_mode: bool = False) -> np.ndarray:
+    def _apply_rotation(
+        self,
+        img: np.ndarray, 
+        angle: float,
+        is_train: bool,
+        bg_color: np.ndarray
+    ) -> np.ndarray:
+        """Apply rotation to image with optional training noise.
+        
+        Args:
+            img: Input image array
+            angle: Base rotation angle in degrees
+            is_train: Whether to add random noise in training
+            bg_color: Background color for cleaning artifacts
+            
+        Returns:
+            Rotated image array
+        """
+        h, w = img.shape[:2]
+        rotation_angle = angle + (self.rng.uniform(-5, 5) if is_train else 0)
+        
+        M = cv2.getRotationMatrix2D((w/2, h/2), rotation_angle, 1.0)
+        rotated = cv2.warpAffine(img, M, (w, h))
+        
+        # Clean up rotation artifacts
+        black_pixels = np.all(rotated < 30, axis=2)
+        rotated[black_pixels] = bg_color
+        
+        return rotated
+    
+    def _rotate_with_background(self, img: np.ndarray, angle: float, is_train: bool = False) -> np.ndarray:
         """Rotate image while preserving background and original canvas size.
         
         Args:
             img: Input image array of shape (H, W, C)
             angle: Rotation angle in degrees
-            train_mode: Whether to apply additional randomization for training
+            is_train: Whether in training mode (adds random rotation noise if True)
             
         Returns:
             Rotated image with same dimensions as input
         """
         if angle == 0:
             return img
-
-        h, w = img.shape[:2]
-        original_size = (w, h)
+            
+        # Get original dimensions for final resize
+        original_size = (img.shape[1], img.shape[0])  # (w, h)
         
-        # Get background color and create canvas
-        bg_color = self._get_background_color(img, train_mode)
-        diagonal = int(np.ceil(np.sqrt(h*h + w*w)))
-        background = self._create_background((diagonal, diagonal), bg_color, train_mode)
+        # Calculate background color
+        bg_color = self._calculate_background_color(img)
         
-        # Clean document edges and place on background
-        img_cleaned = self._clean_document_edges(img, bg_color, train_mode)
-        y_offset, x_offset = self._get_placement_offsets((h, w), (diagonal, diagonal), train_mode)
+        # Clean document borders
+        img_cleaned = self._clean_document_borders(img, bg_color)
         
-        # Place image on background
-        y_end = min(diagonal, y_offset + h)
-        x_end = min(diagonal, x_offset + w)
-        background[y_offset:y_end, x_offset:x_end] = img_cleaned[:y_end-y_offset, :x_end-x_offset]
+        # Create padded background
+        background, (h, w), (y_offset, x_offset) = self._create_padded_background(
+            img_cleaned, bg_color
+        )
         
-        # Rotate with optional noise
-        angle_noise = self.rng.uniform(-5, 5) if train_mode else 0
-        M = cv2.getRotationMatrix2D((diagonal/2, diagonal/2), angle + angle_noise, 1.0)
-        rotated = cv2.warpAffine(background, M, (diagonal, diagonal))
+        # Place cleaned image on background
+        background[y_offset:y_offset+h, x_offset:x_offset+w] = img_cleaned
         
-        # Apply random cropping in training mode
-        if train_mode:
-            crop_margin = int(diagonal * 0.1)  # 10% margin
-            crop_x = self.rng.randint(0, crop_margin)
-            crop_y = self.rng.randint(0, crop_margin)
-            rotated = rotated[crop_y:diagonal-crop_y, crop_x:diagonal-crop_x]
+        # Apply rotation
+        rotated = self._apply_rotation(background, angle, is_train, bg_color)
         
-        # Resize back to original size
+        # Return to original size
         return cv2.resize(rotated, original_size, interpolation=cv2.INTER_LINEAR)
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
@@ -295,7 +296,7 @@ class BaseDocumentDataset(Dataset):
         img = cv2.imread(str(img_path))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
-        # Apply random rotation for train, deterministic for val
+        # Apply random rotation for train, deterministic for val/test
         if self.split == "train":
             rotation = self.rng.randint(0, 7)  # 0=0°, 1=45°, 2=90°, ..., 7=315°
         else:
@@ -303,7 +304,7 @@ class BaseDocumentDataset(Dataset):
             rotation = idx % 8
         
         angle = rotation * 45  # Each step is now 45 degrees
-        img = self._rotate_with_background(img, angle, train_mode=self.split=="train")
+        img = self._rotate_with_background(img, angle, is_train=(self.split == "train"))
         
         # Apply transforms (augmentation for train, just resize/normalize for val)
         if self.transform is not None:

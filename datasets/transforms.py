@@ -30,7 +30,7 @@ def get_train_transforms(image_size: int = 384) -> A.Compose:
         # Realistic document noise - moderate probability
         A.OneOf([
             A.GaussNoise(std_range=(0.0, 0.25), p=1.0),  # Film grain
-            A.MultiplicativeNoise(multiplier_range=(0.95, 1.05), p=1.0),  # Scanner noise
+            A.MultiplicativeNoise(multiplier=(0.95, 1.05), p=1.0),  # Scanner noise
             A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), p=1.0),  # Camera sensor noise
         ], p=0.3),
         
@@ -90,14 +90,11 @@ def get_train_transforms(image_size: int = 384) -> A.Compose:
         
         # Edge effects - lower probability
         A.OneOf([
-            A.RandomSunFlare(
-                flare_roi=(0, 0, 1, 0.5),
-                angle_range=(0, 45),
-                num_flare_circles_range=(1, 3),
-                src_radius=100,
-                src_color=(255, 255, 255),
+            A.RandomBrightnessContrast(
+                brightness_limit=(0.1, 0.3),
+                contrast_limit=(0.1, 0.3),
                 p=1.0
-            ),  # Scanner light leaks
+            ),  # Edge lighting effects
             A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=1.0),  # Edge enhancement
         ], p=0.15),
         

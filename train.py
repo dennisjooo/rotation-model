@@ -29,6 +29,16 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning_model import DocRotationLightning
 from omegaconf import DictConfig, OmegaConf
 
+def set_torch_matmul_precision():
+    """
+    Set the precision of the torch matmul to high if possible.
+    """
+    # Check if it's possible to set the precision to high
+    if torch.backends.mps.is_available():
+        torch.set_float32_matmul_precision('high')
+    else:
+        print("MPS is not available, using default precision")
+
 
 def setup_wandb_logger(cfg: DictConfig) -> WandbLogger:
     """Initialize and configure WandB logger.
@@ -80,7 +90,7 @@ def create_callbacks(cfg: DictConfig) -> List[Callback]:
         ),
         LearningRateMonitor(logging_interval="step"),
         EarlyStopping(
-            monitor="val/accuracy",
+            monitor="val/accuracy_epoch",
             patience=cfg.training.early_stop_patience,
             mode="max",
             min_delta=0.001,
@@ -187,7 +197,18 @@ def export_model(model: DocRotationLightning, cfg: DictConfig, best_model_path: 
     export_dir = Path(cfg.paths.export_dir)
     export_dir.mkdir(parents=True, exist_ok=True)
     
-    model = model.load_from_checkpoint(best_model_path)
+    # Load the best checkpoint properly
+    model = DocRotationLightning.load_from_checkpoint(
+        best_model_path,
+        learning_rate=cfg.model.learning_rate,
+        weight_decay=cfg.model.weight_decay,
+        num_classes=cfg.model.num_classes,
+        scheduler_name=cfg.model.scheduler.name,
+        scheduler_T_0=cfg.model.scheduler.T_0,
+        scheduler_T_mult=cfg.model.scheduler.T_mult,
+        scheduler_eta_min=cfg.model.scheduler.eta_min,
+        scheduler_interval=cfg.model.scheduler.interval,
+    )
     model.eval()
     
     if cfg.export.state_dict.enabled:
@@ -234,6 +255,7 @@ def train(cfg: DictConfig) -> None:
     Args:
         cfg: Hydra configuration object
     """
+    set_torch_matmul_precision()
     seed_everything(cfg.seed)
     os.makedirs(cfg.paths.checkpoint_dir, exist_ok=True)
     
