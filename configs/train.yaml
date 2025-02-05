@@ -58,17 +58,17 @@ model:
 
 # Training configuration
 training:
-  max_epochs: 100
-  early_stop_patience: 15
+  max_epochs: 20
+  early_stop_patience: 10
   gradient_clip_val: 1.0
   accumulate_grad_batches: 4
-  val_check_interval: 0.5
-  log_every_n_steps: 2
+  val_check_interval: 0.25 # I tied the early stopping to val/accuracy which gets logged based on this
+  log_every_n_steps: 1
 
 # Data configuration
 data:
   batch_size: 512
-  num_workers: 2
+  num_workers: 4
   image_size: 384
   persistent_workers: true
   prefetch_factor: 2

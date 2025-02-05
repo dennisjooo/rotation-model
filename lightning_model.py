@@ -7,13 +7,12 @@ document rotation classification model using PyTorch Lightning.
 from typing import Any, Dict, Literal, Tuple
 
 import lightning as pl
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn.functional as F
 from model import DocRotationModel
 from torchmetrics import Accuracy
-import matplotlib.pyplot as plt
-import numpy as np
-
 
 class DocRotationLightning(pl.LightningModule):
     """Lightning module for document rotation classification.
