@@ -9,6 +9,8 @@ Reference:
     arXiv preprint arXiv:2006.01038 (2020).
 """
 
+import os
+from pathlib import Path
 from ..base import BaseDocumentDataset
 
 
@@ -18,6 +20,22 @@ class DocBankDataset(BaseDocumentDataset):
     Contains academic documents with fine-grained token-level annotations.
     Particularly rich in charts, tables, and scientific figures.
     """
+    
+    def __init__(
+        self,
+        root_dir: str | Path = os.path.join(os.getcwd(), "data/docbank"),
+        split: str = "train",
+        img_size: int = 384,
+        val_split: float = 0.1,
+        random_seed: int = 42,
+    ) -> None:
+        super().__init__(
+            root_dir=root_dir,
+            split=split,
+            img_size=img_size,
+            val_split=val_split,
+            random_seed=random_seed,
+        )
     
     def _load_dataset(self) -> None:
         """Load DocBank dataset samples."""

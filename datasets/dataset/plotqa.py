@@ -9,6 +9,8 @@ Reference:
     In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV), 2020.
 """
 
+import os
+from pathlib import Path
 from ..base import BaseDocumentDataset
 
 
@@ -20,6 +22,22 @@ class PlotQADataset(BaseDocumentDataset):
     The dataset was introduced in WACV 2020 for training models to reason over
     scientific visualizations through question answering.
     """
+    
+    def __init__(
+        self,
+        root_dir: str | Path = os.path.join(os.getcwd(), "data/plotqa"),
+        split: str = "train",
+        img_size: int = 384,
+        val_split: float = 0.1,
+        random_seed: int = 42,
+    ) -> None:
+        super().__init__(
+            root_dir=root_dir,
+            split=split,
+            img_size=img_size,
+            val_split=val_split,
+            random_seed=random_seed,
+        )
     
     def _load_dataset(self) -> None:
         """Load PlotQA dataset samples.

@@ -8,6 +8,7 @@ Reference:
     "ICDAR2019 Competition on Scanned Receipt OCR and Information Extraction."
     International Conference on Document Analysis and Recognition (ICDAR), 2019
 """
+
 import os
 from pathlib import Path
 from ..base import BaseDocumentDataset

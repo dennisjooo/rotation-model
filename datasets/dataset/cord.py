@@ -9,6 +9,8 @@ Reference:
     In Document Intelligence Workshop at Neural Information Processing Systems, 2019.
 """
 
+import os
+from pathlib import Path
 from ..base import BaseDocumentDataset
 
 
@@ -18,6 +20,21 @@ class CORDDataset(BaseDocumentDataset):
     Dataset focused on credit card OCR and information extraction.
     Contains credit card images in various orientations and conditions.
     """
+    def __init__(
+        self,
+        root_dir: str | Path = os.path.join(os.getcwd(), "data/cord"),
+        split: str = "train",
+        img_size: int = 384,
+        val_split: float = 0.1,
+        random_seed: int = 42,      
+    ) -> None:
+        super().__init__(
+            root_dir=root_dir,
+            split=split,
+            img_size=img_size,
+            val_split=val_split,
+            random_seed=random_seed,
+        )
     
     def _load_dataset(self) -> None:
         """Load CORD dataset samples."""
