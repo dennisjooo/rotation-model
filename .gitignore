@@ -10,6 +10,8 @@ data/
 outputs/
 logs/
 wandb/
+weights/
+tests/
 
 # Credentials
 kaggle.json
