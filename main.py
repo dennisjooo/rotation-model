@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-
 """Inference script for Document Rotation Model.
 
-This script loads either a PyTorch or ONNX model and performs inference
+This script loads either a ONNX model and performs inference
 on a single input image, predicting its rotation angle and confidence score.
 """
 
@@ -53,8 +51,6 @@ def main():
                        help='Path to input image')
     parser.add_argument('--output_path', type=str, default=None,
                        help='Path to save rotated image (optional)')
-    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu',
-                       help='Device to run inference on (for PyTorch model)')
     args = parser.parse_args()
     
     # Load and preprocess image
@@ -109,7 +105,7 @@ def main():
         
         # Perform rotation
         rotated = cv2.warpAffine(image, rotation_matrix, (new_width, new_height),
-                                flags=cv2.INTER_LINEAR)
+                                 flags=cv2.INTER_LINEAR)
         
         # Save rotated image
         cv2.imwrite(args.output_path, rotated)
