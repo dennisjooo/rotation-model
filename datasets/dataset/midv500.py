@@ -12,7 +12,7 @@ Reference:
 import os
 from pathlib import Path
 
-from .base import BaseDocumentDataset
+from ..base import BaseDocumentDataset
 
 
 class MIDV500Dataset(BaseDocumentDataset):

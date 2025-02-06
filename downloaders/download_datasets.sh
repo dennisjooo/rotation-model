@@ -8,6 +8,10 @@
 # - PubLayNet: Document layout analysis dataset (360k document images)
 # - MIDV-500: Identity document dataset (50 types of ID documents)
 # - SROIE: Receipt information extraction dataset (626 receipt images)
+# - DocBank: Academic document dataset with fine-grained token labels
+# - Chart-QA: Dataset of charts and visualizations
+# - PlotQA: Scientific plots dataset
+# - CORD: Credit card OCR dataset
 #
 # Dataset Details:
 # 1. RVL-CDIP (Ryerson Vision Lab Complex Document Information Processing)
@@ -29,6 +33,26 @@
 #    - 626 receipt images with text annotations
 #    - Task: OCR and key information extraction
 #    - Source: https://www.kaggle.com/datasets/urbikn/sroie-datasetv2
+#
+# 5. DocBank
+#    - 1000+ academic documents with text annotations
+#    - Task: OCR and key information extraction
+#    - Source: https://github.com/doc-analysis/DocBank
+#
+# 6. Chart-QA
+#    - 1000+ scientific charts with text annotations
+#    - Task: OCR and key information extraction
+#    - Source: https://huggingface.co/datasets/HuggingFaceM4/ChartQA
+#
+# 7. PlotQA
+#    - 1000+ scientific plots with text annotations
+#    - Task: OCR and key information extraction
+#    - Source: https://github.com/NiteshMethani/PlotQA
+#
+# 8. CORD
+#    - 1000+ credit cards with text annotations
+#    - Task: OCR and key information extraction
+#    - Source: https://huggingface.co/datasets/naver-clova-ix/cord-v2
 #
 # Requirements:
 # - Kaggle API credentials (kaggle.json)
@@ -69,6 +93,12 @@ check_dependencies() {
     if ! command -v unzip &> /dev/null; then
         echo "unzip not found. Installing..."
         sudo apt-get install unzip
+    fi
+    
+    # Check and install gdown for Google Drive downloads
+    if ! command -v gdown &> /dev/null; then
+        echo "gdown not found. Installing..."
+        pip install gdown
     fi
 }
 
@@ -163,9 +193,74 @@ download_sroie() {
     rm -rf data/sroie/temp
 }
 
+download_docbank() {
+    if [ -d "data/docbank" ] && [ "$(ls -A data/docbank/*.pdf 2>/dev/null)" ]; then
+        echo "DocBank dataset already exists, skipping download..."
+        return
+    fi
+    echo "Downloading DocBank dataset..."
+    mkdir -p data/docbank
+    
+    # Download from official source
+    wget https://github.com/doc-analysis/DocBank/raw/master/DocBank_samples/DocBank_samples.zip -P data/docbank/
+    unzip data/docbank/DocBank_samples.zip -d data/docbank/
+    rm data/docbank/DocBank_samples.zip
+}
+
+download_chartqa() {
+    if [ -d "data/chartqa" ] && [ "$(ls -A data/chartqa/*.jpg 2>/dev/null)" ]; then
+        echo "Chart-QA dataset already exists, skipping download..."
+        return
+    fi
+    echo "Downloading Chart-QA dataset..."
+    mkdir -p data/chartqa
+    
+    # Download from HuggingFace
+    git clone https://huggingface.co/datasets/HuggingFaceM4/ChartQA data/chartqa-temp
+    mv data/chartqa-temp/train/* data/chartqa/
+    rm -rf data/chartqa-temp
+}
+
+download_plotqa() {
+    if [ -d "data/plotqa" ] && [ "$(ls -A data/plotqa/*.png 2>/dev/null)" ]; then
+        echo "PlotQA dataset already exists, skipping download..."
+        return
+    fi
+    echo "Downloading PlotQA dataset..."
+    mkdir -p data/plotqa
+    
+    # Download from Google Drive using gdown
+    echo "Downloading PlotQA dataset from Google Drive..."
+    gdown https://drive.google.com/uc?id=1i74NRCEb-x44xqzAovuglex5d583qeiF -O data/plotqa/png.tar.gz
+    
+    echo "Extracting dataset..."
+    tar -xzf data/plotqa/png.tar.gz -C data/plotqa/
+    rm data/plotqa/png.tar.gz
+    
+    # Move all PNG images to root directory if they're in subdirectories
+    find data/plotqa -type f -name "*.png" -exec mv {} data/plotqa/ \;
+    
+    # Clean up any empty subdirectories
+    find data/plotqa -type d -empty -delete
+}
+
+download_cord() {
+    if [ -d "data/cord" ] && [ "$(ls -A data/cord/*.jpg 2>/dev/null)" ]; then
+        echo "CORD dataset already exists, skipping download..."
+        return
+    fi
+    echo "Downloading CORD dataset..."
+    mkdir -p data/cord
+    
+    # Download from HuggingFace
+    git clone https://huggingface.co/datasets/cord-v2 data/cord-temp
+    mv data/cord-temp/train/* data/cord/
+    rm -rf data/cord-temp
+}
+
 # ========== Main Script ========== #
 # Create base data directories
-mkdir -p data/{rvl-cdip,publaynet,midv500,sroie}
+mkdir -p data/{rvl-cdip,publaynet,midv500,sroie,docbank,chartqa,plotqa,cord}
 
 # Check and install dependencies
 check_dependencies
@@ -180,6 +275,10 @@ download_rvl_cdip
 download_publaynet
 download_midv500
 download_sroie
+download_docbank
+download_chartqa
+download_plotqa
+download_cord
 
 echo "Done! Datasets have been downloaded and organized in the data directory."
 

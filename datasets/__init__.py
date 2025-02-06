@@ -1,20 +1,17 @@
-"""Document rotation datasets package.
-
-This package provides datasets and dataloaders for document rotation classification.
-"""
+"""Document datasets package."""
 
 from .base import BaseDocumentDataset
-from .dataloader import create_dataloaders
-from .rvl_cdip import RVLCDIPDataset
-from .publaynet import PubLayNetDataset
-from .midv500 import MIDV500Dataset
-from .sroie import SROIEDataset
+from .dataset import *
+from .dataloader import *
 
 __all__ = [
-    'BaseDocumentDataset',
-    'create_dataloaders',
-    'RVLCDIPDataset',
-    'PubLayNetDataset',
-    'MIDV500Dataset',
-    'SROIEDataset',
+    "BaseDocumentDataset",
+    "ChartQADataset",
+    "CORDDataset",
+    "DocBankDataset",
+    "MIDV500Dataset",
+    "PlotQADataset",
+    "PubLayNetDataset",
+    "RVLCDIPDataset",
+    "SROIEDataset",
 ] 
