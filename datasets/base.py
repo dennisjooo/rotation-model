@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset
 
-from .transforms import get_train_transforms, get_val_transforms
+from transforms import DocumentTransforms, RotateWithBackground
 
 
 class BaseDocumentDataset(Dataset):
@@ -58,7 +58,8 @@ class BaseDocumentDataset(Dataset):
         self._load_and_split_dataset()
         
         # Set up transforms based on split
-        self.transform = get_train_transforms(img_size) if split == "train" else get_val_transforms(img_size)
+        transforms = DocumentTransforms(img_size)
+        self.transform = transforms.train_transform() if split == "train" else transforms.val_transform()
     
     @classmethod
     def create_splits(
@@ -149,134 +150,22 @@ class BaseDocumentDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
     
-    def _calculate_background_color(self, img: np.ndarray) -> np.ndarray:
-        """Calculate background color by blending mean document color with white.
+    def rotate_with_background(self, image: np.ndarray, angle: float, is_train: bool) -> np.ndarray:
+        """Rotate image with background handling.
         
         Args:
-            img: Input image array of shape (H, W, C)
-            
-        Returns:
-            Background color as RGB array
-        """
-        # Calculate mean color of non-black pixels
-        non_black_mask = np.any(img > 30, axis=2)
-        mean_color = np.mean(img[non_black_mask], axis=0).astype(np.uint8)
-        
-        # Blend with white (10% mean + 90% white)
-        white = np.array([255, 255, 255], dtype=np.uint8)
-        return (0.1 * mean_color + 0.9 * white).astype(np.uint8)
-    
-    def _clean_document_borders(self, img: np.ndarray, bg_color: np.ndarray) -> np.ndarray:
-        """Replace black borders with background color.
-        
-        Args:
-            img: Input image array
-            bg_color: Background color to use for borders
-            
-        Returns:
-            Cleaned image with black borders replaced
-        """
-        document_mask = np.any(img > 30, axis=2)
-        img_cleaned = img.copy()
-        img_cleaned[~document_mask] = bg_color
-        return img_cleaned
-    
-    def _create_padded_background(
-        self, 
-        img: np.ndarray, 
-        bg_color: np.ndarray
-    ) -> Tuple[np.ndarray, Tuple[int, int], Tuple[int, int]]:
-        """Create padded background and calculate placement offsets.
-        
-        Args:
-            img: Input image array
-            bg_color: Background color to use
-            
-        Returns:
-            Tuple of:
-                - Padded background array
-                - Original dimensions (h, w)
-                - Offset coordinates (y_offset, x_offset)
-        """
-        h, w = img.shape[:2]
-        diagonal = int(np.ceil(np.sqrt(h*h + w*w)))
-        
-        # Create square background
-        background = np.full((diagonal, diagonal, 3), bg_color, dtype=np.uint8)
-        
-        # Calculate center offsets
-        y_offset = (diagonal - h) // 2
-        x_offset = (diagonal - w) // 2
-        
-        return background, (h, w), (y_offset, x_offset)
-    
-    def _apply_rotation(
-        self,
-        img: np.ndarray, 
-        angle: float,
-        is_train: bool,
-        bg_color: np.ndarray
-    ) -> np.ndarray:
-        """Apply rotation to image with optional training noise.
-        
-        Args:
-            img: Input image array
-            angle: Base rotation angle in degrees
-            is_train: Whether to add random noise in training
-            bg_color: Background color for cleaning artifacts
+            image: Input image array
+            angle: Rotation angle in degrees
             
         Returns:
             Rotated image array
         """
-        h, w = img.shape[:2]
-        rotation_angle = angle + (self.rng.uniform(-5, 5) if is_train else 0)
+        return RotateWithBackground(
+            angle=angle,
+            is_train=is_train,
+            random_state=self.random_seed
+        )(image=image)["image"]
         
-        M = cv2.getRotationMatrix2D((w/2, h/2), rotation_angle, 1.0)
-        rotated = cv2.warpAffine(img, M, (w, h))
-        
-        # Clean up rotation artifacts
-        black_pixels = np.all(rotated < 30, axis=2)
-        rotated[black_pixels] = bg_color
-        
-        return rotated
-    
-    def _rotate_with_background(self, img: np.ndarray, angle: float, is_train: bool = False) -> np.ndarray:
-        """Rotate image while preserving background and original canvas size.
-        
-        Args:
-            img: Input image array of shape (H, W, C)
-            angle: Rotation angle in degrees
-            is_train: Whether in training mode (adds random rotation noise if True)
-            
-        Returns:
-            Rotated image with same dimensions as input
-        """
-        if angle == 0:
-            return img
-            
-        # Get original dimensions for final resize
-        original_size = (img.shape[1], img.shape[0])  # (w, h)
-        
-        # Calculate background color
-        bg_color = self._calculate_background_color(img)
-        
-        # Clean document borders
-        img_cleaned = self._clean_document_borders(img, bg_color)
-        
-        # Create padded background
-        background, (h, w), (y_offset, x_offset) = self._create_padded_background(
-            img_cleaned, bg_color
-        )
-        
-        # Place cleaned image on background
-        background[y_offset:y_offset+h, x_offset:x_offset+w] = img_cleaned
-        
-        # Apply rotation
-        rotated = self._apply_rotation(background, angle, is_train, bg_color)
-        
-        # Return to original size
-        return cv2.resize(rotated, original_size, interpolation=cv2.INTER_LINEAR)
-
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         """Get a sample from the dataset.
         
@@ -304,7 +193,9 @@ class BaseDocumentDataset(Dataset):
             rotation = idx % 8
         
         angle = rotation * 45  # Each step is now 45 degrees
-        img = self._rotate_with_background(img, angle, is_train=(self.split == "train"))
+        
+        # Apply rotation with background handling
+        img = self.rotate_with_background(image=img, angle=angle, is_train=self.split == "train")
         
         # Apply transforms (augmentation for train, just resize/normalize for val)
         if self.transform is not None:
