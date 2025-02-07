@@ -1,12 +1,14 @@
-
-    
 import numpy as np
+from omegaconf import OmegaConf
 from .rotate_with_background import RotateWithBackground
 from .document_transforms import DocumentTransforms
 
+# Load the hydra config from configs/train.yaml
+cfg = OmegaConf.load("configs/train.yaml")
+
 # Initialize transforms used for inference
 rotate_with_background = RotateWithBackground()
-document_transforms = DocumentTransforms()
+document_transforms = DocumentTransforms(image_size=cfg.data.image_size)
 
 
 def preprocess(image: np.ndarray) -> np.ndarray:
