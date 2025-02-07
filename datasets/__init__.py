@@ -8,10 +8,10 @@ __all__ = [
     "BaseDocumentDataset",
     "ChartQADataset",
     "CORDDataset",
-    "DocBankDataset",
     "MIDV500Dataset",
     "PlotQADataset",
     "PubLayNetDataset",
     "RVLCDIPDataset",
     "SROIEDataset",
+    "TableBenchDataset",
 ] 

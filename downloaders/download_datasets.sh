@@ -8,10 +8,10 @@
 # - PubLayNet: Document layout analysis dataset (360k document images)
 # - MIDV-500: Identity document dataset (50 types of ID documents)
 # - SROIE: Receipt information extraction dataset (626 receipt images)
-# - DocBank: Academic document dataset with fine-grained token labels
 # - Chart-QA: Dataset of charts and visualizations
 # - PlotQA: Scientific plots dataset
 # - CORD: Credit card OCR dataset
+# - TableBench: Table understanding and extraction dataset
 #
 # Dataset Details:
 # 1. RVL-CDIP (Ryerson Vision Lab Complex Document Information Processing)
@@ -34,25 +34,24 @@
 #    - Task: OCR and key information extraction
 #    - Source: https://www.kaggle.com/datasets/urbikn/sroie-datasetv2
 #
-# 5. DocBank
-#    - 1000+ academic documents with text annotations
-#    - Task: OCR and key information extraction
-#    - Source: https://github.com/doc-analysis/DocBank
-#
-# 6. Chart-QA
+# 5. Chart-QA
 #    - 1000+ scientific charts with text annotations
 #    - Task: OCR and key information extraction
 #    - Source: https://huggingface.co/datasets/HuggingFaceM4/ChartQA
 #
-# 7. PlotQA
+# 6. PlotQA
 #    - 1000+ scientific plots with text annotations
 #    - Task: OCR and key information extraction
 #    - Source: https://github.com/NiteshMethani/PlotQA
 #
-# 8. CORD
+# 7. CORD
 #    - 1000+ credit cards with text annotations
 #    - Task: OCR and key information extraction
 #    - Source: https://huggingface.co/datasets/naver-clova-ix/cord-v2
+#
+# 8. TableBench
+#    - Table understanding and extraction dataset
+#    - Source: https://huggingface.co/datasets/reducto/rd-tablebench
 #
 # Requirements:
 # - Kaggle API credentials (kaggle.json)
@@ -81,13 +80,13 @@ source "$SCRIPT_DIR/datasets/rvl_cdip.sh"
 source "$SCRIPT_DIR/datasets/publaynet.sh"
 source "$SCRIPT_DIR/datasets/midv500.sh"
 source "$SCRIPT_DIR/datasets/sroie.sh"
-source "$SCRIPT_DIR/datasets/docbank.sh"
 source "$SCRIPT_DIR/datasets/chartqa.sh"
 source "$SCRIPT_DIR/datasets/plotqa.sh"
 source "$SCRIPT_DIR/datasets/cord.sh"
+source "$SCRIPT_DIR/datasets/tablebench.sh"
 
 # Create base data directories
-mkdir -p data/{rvl-cdip,publaynet,midv500,sroie,docbank,chartqa,plotqa,cord}
+mkdir -p data/{rvl-cdip,publaynet,midv500,sroie,chartqa,plotqa,cord,tablebench}
 
 # Check and install dependencies
 check_dependencies
@@ -102,10 +101,10 @@ download_rvl_cdip
 download_publaynet
 download_midv500
 download_sroie
-download_docbank
 download_chartqa
 download_plotqa
 download_cord
+download_tablebench
 
 echo "Done! Datasets have been downloaded and organized in the data directory."
 

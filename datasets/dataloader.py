@@ -26,9 +26,9 @@ def get_dataset_class(name: str) -> type:
         "midv500": MIDV500Dataset,
         "sroie": SROIEDataset,
         "chartqa": ChartQADataset,
-        "docbank": DocBankDataset,
         "plotqa": PlotQADataset,
         "cord": CORDDataset,
+        "tablebench": TableBenchDataset,
     }
     
     if name not in datasets:

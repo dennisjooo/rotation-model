@@ -18,7 +18,7 @@ download_cord() {
     ensure_dir "$data_dir"
     
     # Download from HuggingFace
-    git clone https://huggingface.co/datasets/cord-v2 "$temp_dir"
+    git clone https://huggingface.co/datasets/naver-clova-ix/cord-v2 "$temp_dir"
     mv "$temp_dir/train/"* "$data_dir/"
     rm -rf "$temp_dir"
 }
