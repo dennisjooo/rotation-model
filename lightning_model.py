@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from model import DocRotationModel
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, MeanMetric
 
 class DocRotationLightning(pl.LightningModule):
     """Lightning module for document rotation classification.
@@ -20,13 +20,6 @@ class DocRotationLightning(pl.LightningModule):
     Implements training, validation, and test loops for the DocRotationModel
     using PyTorch Lightning, including metrics tracking and optimizer configuration.
     Handles 8 rotation classes (0°, 45°, 90°, ..., 315°).
-    
-    Attributes:
-        model: The underlying DocRotationModel
-        train_accuracy: Accuracy metric for training
-        val_accuracy: Accuracy metric for validation
-        test_accuracy: Accuracy metric for testing
-        learning_rate: Learning rate for optimization
     """
     
     def __init__(
@@ -66,13 +59,37 @@ class DocRotationLightning(pl.LightningModule):
         self.scheduler_eta_min = scheduler_eta_min
         self.scheduler_interval = scheduler_interval
         
+        # Set metrics
+        self._set_metrics(num_classes)
+
+        # Save hyperparameters for logging
+        self.save_hyperparameters()
+        
+    def _set_metrics(self, num_classes: int):
+        """Set up metrics for tracking model performance.
+        
+        Initializes metrics for tracking overall accuracy, per-class accuracy,
+        angular error, and prediction confidence during training and validation.
+        
+        Args:
+            num_classes: Number of rotation classes (e.g. 8 for 45-degree intervals)
+        """
         # Metrics
         self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         self.test_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         
-        # Save hyperparameters for logging
-        self.save_hyperparameters()
+        # Add per-class accuracy tracking
+        self.val_accuracy_per_class = torch.nn.ModuleList([
+            Accuracy(task="binary") for _ in range(num_classes)
+        ])
+        
+        # Add angular error metric
+        self.val_angular_error = MeanMetric()
+        
+        # Track confidence metrics
+        self.val_confidence_correct = MeanMetric()
+        self.val_confidence_incorrect = MeanMetric()
     
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
@@ -85,6 +102,117 @@ class DocRotationLightning(pl.LightningModule):
         """
         return self.model(x)
     
+    def _compute_losses(
+        self,
+        logits: torch.Tensor,
+        confidence: torch.Tensor,
+        pred: torch.Tensor,
+        y: torch.Tensor,
+        stage: str
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute classification, angular, and confidence losses.
+        
+        Args:
+            logits: Model logits output
+            confidence: Model confidence output
+            pred: Predicted classes
+            y: True labels
+            stage: Current stage (train/val/test)
+            
+        Returns:
+            Tuple containing:
+                - total_loss: Combined weighted loss
+                - cls_loss: Classification loss
+                - angular_loss: Angular distance loss
+                - confidence_loss: Confidence prediction loss
+                - angular_diff: Angular difference between predictions and targets
+        """
+        # 1. Classification loss with label smoothing
+        cls_loss = F.cross_entropy(logits, y, label_smoothing=0.1)
+        
+        # 2. Angular loss
+        angles_pred = pred * 45
+        angles_true = y * 45
+        angular_diff = torch.abs(angles_pred - angles_true)
+        angular_diff = torch.min(angular_diff, 360 - angular_diff)
+        angular_loss = angular_diff.float().mean()
+        
+        # 3. Enhanced confidence loss
+        correct_mask = (pred == y)
+        
+        # Weight confidence loss based on angular difference
+        angular_weight = angular_diff.float() / 180.0  # Normalize to [0, 1]
+        confidence_target = (1.0 - angular_weight) * correct_mask.float()
+        
+        confidence_loss = F.binary_cross_entropy_with_logits(
+            confidence.squeeze(), 
+            confidence_target,
+            reduction='none'
+        )
+        confidence_loss = confidence_loss.mean()
+        
+        # Combine losses with adaptive weighting
+        confidence_weight = 0.1 if stage == "train" else 0.05
+        angular_weight = 0.1
+        total_loss = cls_loss + confidence_weight * confidence_loss + angular_weight * angular_loss
+        
+        return total_loss, cls_loss, angular_loss, confidence_loss, angular_diff
+
+    def _log_metrics(
+        self,
+        stage: str,
+        batch_size: int,
+        accuracy: torch.Tensor,
+        cls_loss: torch.Tensor,
+        confidence_loss: torch.Tensor,
+        angular_loss: torch.Tensor,
+        total_loss: torch.Tensor,
+        angular_diff: torch.Tensor,
+        confidence_pred: torch.Tensor,
+        correct_mask: torch.Tensor,
+        y: torch.Tensor,
+        pred: torch.Tensor
+    ) -> None:
+        """Log all metrics for the current stage.
+        
+        Args:
+            stage: Current stage (train/val/test)
+            batch_size: Size of the current batch
+            accuracy: Current accuracy metric
+            cls_loss: Classification loss value
+            confidence_loss: Confidence loss value
+            angular_loss: Angular loss value
+            total_loss: Combined loss value
+            angular_diff: Angular difference between predictions and targets
+            confidence_pred: Predicted confidence scores
+            correct_mask: Boolean mask of correct predictions
+            y: True labels
+            pred: Predicted classes
+        """
+        # Log losses
+        self.log(f"{stage}/cls_loss", cls_loss, batch_size=batch_size)
+        self.log(f"{stage}/conf_loss", confidence_loss, batch_size=batch_size)
+        self.log(f"{stage}/angular_loss", angular_loss, batch_size=batch_size)
+        self.log(f"{stage}/total_loss", total_loss, batch_size=batch_size)
+        self.log(f"{stage}/accuracy", accuracy, batch_size=batch_size)
+        self.log(f"{stage}/angular_error", angular_diff.mean(), batch_size=batch_size)
+        
+        # Log validation-specific metrics
+        if stage == "val":
+            if correct_mask.any():
+                self.val_confidence_correct(confidence_pred[correct_mask].mean())
+            if (~correct_mask).any():
+                self.val_confidence_incorrect(confidence_pred[~correct_mask].mean())
+            
+            # Per-class accuracy
+            for i in range(8):
+                mask = y == i
+                if mask.any():
+                    self.val_accuracy_per_class[i](pred[mask], y[mask])
+                    self.log(f"val/accuracy_{i*45}deg", 
+                            self.val_accuracy_per_class[i],
+                            on_epoch=True)
+
     def _shared_step(
         self, 
         batch: Dict[str, Any],
@@ -93,63 +221,62 @@ class DocRotationLightning(pl.LightningModule):
         """Shared step logic for training, validation and testing.
         
         Args:
-            batch: Data batch from dataloader containing:
-                - image: Tensor of shape (batch_size, channels, height, width)
-                - rotation: Tensor of rotation classes
-                - rotation_angle: Tensor of actual rotation angles
-                - path: List of image paths
+            batch: Data batch from dataloader
             stage: Current stage ("train", "val", or "test")
             
         Returns:
             Dictionary containing the loss and predictions
         """
-        # Extract image and rotation label from batch
+        # Extract batch data
         x = batch["image"]
         y = batch["rotation"]
         rotation_angles = batch["rotation_angle"]
+        batch_size = x.size(0)
         
+        # Forward pass
         logits, confidence = self(x)
+        pred = torch.argmax(logits, dim=1)
         
         # Get accuracy metric for current stage
         accuracy = getattr(self, f"{stage}_accuracy")
         accuracy(logits, y)
         
-        # Classification loss with label smoothing
-        cls_loss = F.cross_entropy(logits, y, label_smoothing=0.1)
-        
-        # Confidence loss with focal-like weighting
-        pred = torch.argmax(logits, dim=1)
-        confidence_target = (pred == y).float()
-        confidence_pred = torch.sigmoid(confidence.squeeze())
-        
-        # Weight confidence loss based on prediction certainty
-        confidence_weights = torch.abs(confidence_target - confidence_pred).detach()
-        confidence_loss = F.binary_cross_entropy_with_logits(
-            confidence.squeeze(), 
-            confidence_target,
-            reduction='none'
+        # Compute all losses
+        total_loss, cls_loss, angular_loss, confidence_loss, angular_diff = self._compute_losses(
+            logits, confidence, pred, y, stage
         )
-        confidence_loss = (confidence_weights * confidence_loss).mean()
         
-        # Adaptive loss weighting
-        confidence_weight = 0.1 if stage == "train" else 0.05
-        loss = cls_loss + confidence_weight * confidence_loss
+        # Get confidence predictions for logging
+        confidence_pred = torch.sigmoid(confidence.squeeze())
+        correct_mask = (pred == y)
         
-        # Log detailed metrics
-        batch_size = x.size(0)
-        self.log(f"{stage}/cls_loss", cls_loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
-        self.log(f"{stage}/conf_loss", confidence_loss, on_step=True, on_epoch=True, prog_bar=False, batch_size=batch_size)
-        self.log(f"{stage}/loss", loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
-        self.log(f"{stage}/accuracy", accuracy, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        # Log all metrics
+        self._log_metrics(
+            stage=stage,
+            batch_size=batch_size,
+            accuracy=accuracy,
+            cls_loss=cls_loss,
+            confidence_loss=confidence_loss,
+            angular_loss=angular_loss,
+            total_loss=total_loss,
+            angular_diff=angular_diff,
+            confidence_pred=confidence_pred,
+            correct_mask=correct_mask,
+            y=y,
+            pred=pred
+        )
         
         return {
-            "loss": loss, 
-            "logits": logits, 
+            "loss": total_loss,
+            "logits": logits,
             "confidence": confidence,
             "pred": pred,
             "y": y,
             "x": x,
-            "rotation_angles": rotation_angles
+            "rotation_angles": rotation_angles,
+            "angular_diff": angular_diff,
+            "confidence_pred": confidence_pred,
+            "correct_mask": correct_mask
         }
     
     def _log_predictions(self, outputs: Dict[str, Any], stage: str, batch_idx: int) -> None:
@@ -162,59 +289,57 @@ class DocRotationLightning(pl.LightningModule):
         """
         if batch_idx % 50 != 0:  # Log every 50 batches
             return
-            
+        
         # Get predictions and images
         images = outputs["x"]
         preds = outputs["pred"]
         angles = outputs["rotation_angles"]
-        confidence = torch.sigmoid(outputs["confidence"].squeeze())  # Convert to probability
-        
-        # Convert rotation class to angle
-        pred_angles = preds * 45
+        confidence = outputs["confidence_pred"]
+        angular_diff = outputs["angular_diff"]
         
         # Take up to 4 samples
         num_samples = min(4, len(images))
         images = images[:num_samples]
-        pred_angles = pred_angles[:num_samples]
+        pred_angles = preds[:num_samples] * 45
         angles = angles[:num_samples]
         confidence = confidence[:num_samples]
+        angular_diff = angular_diff[:num_samples]
         
-        # Create a figure with subplots with more height for titles
+        # Create figure with subplots
         fig, axes = plt.subplots(1, num_samples, figsize=(4*num_samples, 5))
         if num_samples == 1:
             axes = [axes]
         
-        # Plot each image with its predictions
-        for i, (img, pred_angle, true_angle, conf) in enumerate(zip(images, pred_angles, angles, confidence)):
-            # Convert image tensor to numpy and transpose to (H, W, C)
+        # Plot each image with enhanced information
+        for i, (img, pred_angle, true_angle, conf, ang_err) in enumerate(
+            zip(images, pred_angles, angles, confidence, angular_diff)):
+            # Convert and normalize image
             img_np = img.cpu().numpy().transpose(1, 2, 0)
-            
-            # Normalize image for display
             img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
             
             # Plot image
             axes[i].imshow(img_np)
             axes[i].axis('off')
             
-            # Add caption with increased padding and smaller font
-            caption = f'Pred: {pred_angle.item():.0f}°\nTrue: {true_angle.item():.0f}°\nConf: {conf.item():.2f}'
-            axes[i].set_title(caption, fontsize=8, pad=10)
+            # Enhanced caption with angular error
+            caption = (f'Pred: {pred_angle.item():.0f}°\n'
+                      f'True: {true_angle.item():.0f}°\n'
+                      f'Conf: {conf.item():.2f}\n'
+                      f'Err: {ang_err.item():.1f}°')
+            
+            # Color-code title based on error
+            color = 'green' if ang_err < 45 else 'red'
+            axes[i].set_title(caption, fontsize=8, pad=10, color=color)
         
-        # Adjust layout with more space at the top
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         
-        # Convert figure to numpy array
+        # Convert to image and log
         fig.canvas.draw()
-        # Get the RGBA buffer from the figure
         w, h = fig.canvas.get_width_height()
-        buf = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-        # Reshape it to a proper image array
-        img_data = buf.reshape(h, w, 4)
-        # Convert RGBA to RGB
-        img_data = img_data[:, :, :3]
+        img_data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        img_data = img_data.reshape(h, w, 4)[:, :, :3]
         plt.close()
         
-        # Log the image
         self.logger.log_image(f"{stage}/predictions", images=[img_data])
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> Dict[str, Any]:
@@ -283,6 +408,17 @@ class DocRotationLightning(pl.LightningModule):
                 "name": self.scheduler_name
             }
         }
+
+    def on_validation_epoch_end(self):
+        """Log additional validation metrics at epoch end."""
+        # Log confidence metrics
+        self.log("val/confidence_correct", self.val_confidence_correct.compute())
+        self.log("val/confidence_incorrect", self.val_confidence_incorrect.compute())
+        
+        # Reset metrics
+        self.val_confidence_correct.reset()
+        self.val_confidence_incorrect.reset()
+        self.val_angular_error.reset()
 
 
 if __name__ == "__main__":

@@ -1,12 +1,12 @@
 """Document Rotation Model for classifying document orientations.
 
 This module implements a lightweight deep learning model for document rotation classification
-using MobileNetV3-Large as the backbone, enhanced with CoordConv and selective attention
+using MobileNetV3-Small as the backbone, enhanced with CoordConv and selective attention
 for better spatial awareness and feature extraction.
 
 The model architecture consists of:
 - CoordConv input layer for spatial awareness
-- MobileNetV3-Large backbone with multi-scale feature extraction
+- MobileNetV3-Small backbone with multi-scale feature extraction
 - CBAM attention modules at different scales
 - Multi-scale feature pooling and fusion
 - Separate classification and confidence prediction heads
@@ -21,14 +21,14 @@ Key Features:
 from __future__ import annotations
 import torch
 import torch.nn as nn
-from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights
+from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 from torch import Tensor
 from typing import Tuple
 
 class DocRotationModel(nn.Module):
     """Lightweight document rotation classification model.
     
-    This model combines MobileNetV3-large backbone with CoordConv and selective attention
+    This model combines MobileNetV3-small backbone with CoordConv and selective attention
     to classify document rotations into 8 classes (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
     and predict confidence scores.
     
@@ -46,19 +46,19 @@ class DocRotationModel(nn.Module):
             nn.Hardswish(inplace=True)                           # Non-linear activation
         )
         
-        # Load pretrained MobileNetV3-Large backbone
-        backbone = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
+        # Load pretrained MobileNetV3-Small backbone
+        backbone = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
         
         # Split backbone into three scales for hierarchical feature extraction
-        # MobileNetV3-Large feature dimensions: 16 -> 24 -> 40 -> 80 -> 112 -> 160 -> 960
-        self.early_features = nn.Sequential(*list(backbone.features[:3]))      # Low-level features (24 channels)
-        self.mid_features = nn.Sequential(*list(backbone.features[3:6]))       # Mid-level features (40 channels)
-        self.late_features = nn.Sequential(*list(backbone.features[6:]))       # High-level features (960 channels)
+        # MobileNetV3-Small feature dimensions: 16 -> 24 -> 40 -> 48 -> 96 -> 576
+        self.early_features = nn.Sequential(*list(backbone.features[:2]))      # Low-level features (16 channels)
+        self.mid_features = nn.Sequential(*list(backbone.features[2:5]))      # Mid-level features (40 channels)
+        self.late_features = nn.Sequential(*list(backbone.features[5:]))      # High-level features (576 channels)
         
         # Add CBAM attention at each scale with appropriate reduction ratios
-        self.early_attn = CBAM(24, reduction=4)      # Strong attention for early features
-        self.mid_attn = CBAM(40, reduction=4)        # Balanced attention for mid features
-        self.late_attn = CBAM(960, reduction=32)     # Light attention for semantic features
+        self.early_attn = CBAM(16, reduction=4)      # Strong attention for early features
+        self.mid_attn = CBAM(40, reduction=8)        # Balanced attention for mid features
+        self.late_attn = CBAM(576, reduction=32)     # Light attention for semantic features
         
         # Multi-scale pooling for capturing both global and local patterns
         self.global_pool = nn.AdaptiveAvgPool2d(1)
@@ -69,8 +69,8 @@ class DocRotationModel(nn.Module):
         
         # Calculate total feature dimensions after concatenation
         total_features = (
-            960 +           # Global semantic features
-            24 * 4 * 4 +   # Early local features (24 channels x 4x4)
+            576 +           # Global semantic features
+            16 * 4 * 4 +   # Early local features (16 channels x 4x4)
             40 * 2 * 2     # Mid local features (40 channels x 2x2)
         )
         
