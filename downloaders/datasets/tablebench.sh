@@ -22,8 +22,8 @@ download_tablebench() {
     echo "Extracting dataset..."
     unzip "$data_dir/rd-tablebench.zip" -d "$data_dir/"
     
-    echo "Moving all PNG images to root directory..."
-    find "$data_dir/rd-tablebench" -type f -name "*.png" -exec mv {} "$data_dir/" \;
+    echo "Moving all JPG images to root directory..."
+    find "$data_dir/rd-tablebench" -type f -name "*.jpg" -exec mv {} "$data_dir/" \;
     
     echo "Cleaning up..."
     rm "$data_dir/rd-tablebench.zip"

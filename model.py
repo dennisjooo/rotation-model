@@ -307,10 +307,11 @@ if __name__ == "__main__":
     # Test with different input sizes and measure inference speed
     import time, tqdm
     num_runs = 20
+    batch_size = 16
     
     for size in [384, 512]:
         times = []
-        dummy_input = torch.randn(8, 3, size, size)
+        dummy_input = torch.randn(batch_size, 3, size, size)
         
         # Warmup run
         logits, confidence = model(dummy_input)
@@ -323,7 +324,9 @@ if __name__ == "__main__":
             
         avg_time = sum(times) / len(times)
         std_time = (sum((t - avg_time) ** 2 for t in times) / len(times)) ** 0.5
+        avg_time_per_image = sum(times) / (len(times) * batch_size)
         
         print(f"Input {size}x{size}:")
         print(f"  Shapes: Rotation logits {logits.shape}, Confidence {confidence.shape}")
-        print(f"  Speed: {avg_time*1000:.1f}ms ± {std_time*1000:.1f}ms")
+        print(f"  Speed: {avg_time*1000:.1f}ms ± {std_time*1000:.1f}ms (batch size {batch_size})")
+        print(f"  Speed per image: {avg_time_per_image*1000:.1f}ms")

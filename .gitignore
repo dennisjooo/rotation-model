@@ -24,3 +24,6 @@ kaggle.json
 # OS
 .DS_Store
 Thumbs.db
+
+# SSH
+rsync.sh

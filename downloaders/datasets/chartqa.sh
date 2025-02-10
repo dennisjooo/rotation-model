@@ -19,7 +19,11 @@ download_chartqa() {
     
     # Download from HuggingFace
     git clone https://huggingface.co/datasets/HuggingFaceM4/ChartQA "$temp_dir"
-    mv "$temp_dir/train/"* "$data_dir/"
+    
+    # Process the parquet files using the utility script
+    python3 "$SCRIPT_DIR/utils.py" "chartqa" "$temp_dir/data" "$data_dir"
+    
+    # Cleanup
     rm -rf "$temp_dir"
 }
 

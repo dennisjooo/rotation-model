@@ -19,7 +19,11 @@ download_cord() {
     
     # Download from HuggingFace
     git clone https://huggingface.co/datasets/naver-clova-ix/cord-v2 "$temp_dir"
-    mv "$temp_dir/train/"* "$data_dir/"
+    
+    # Process the parquet files using the utility script
+    python3 "$SCRIPT_DIR/utils.py" "cord" "$temp_dir/data" "$data_dir"
+    
+    # Cleanup
     rm -rf "$temp_dir"
 }
 

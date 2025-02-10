@@ -70,20 +70,28 @@
 # 5. Clean up temporary files
 # ==========================================================================
 
-# Get the directory where the script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$(dirname "$SCRIPT_DIR")"  # Move to parent directory of script
+# Get the directory where the script is located and export for child scripts
+export SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export ORIGINAL_DIR="$(pwd)"  # Store original directory
+export SCRIPT_PARENT_DIR="$(dirname "$SCRIPT_DIR")"  # Store parent directory path
+cd "$SCRIPT_PARENT_DIR"  # Move to parent directory of script
 
-# Source utilities and dataset downloaders
+# Source utilities first
 source "$SCRIPT_DIR/utils.sh"
-source "$SCRIPT_DIR/datasets/rvl_cdip.sh"
-source "$SCRIPT_DIR/datasets/publaynet.sh"
-source "$SCRIPT_DIR/datasets/midv500.sh"
-source "$SCRIPT_DIR/datasets/sroie.sh"
-source "$SCRIPT_DIR/datasets/chartqa.sh"
-source "$SCRIPT_DIR/datasets/plotqa.sh"
-source "$SCRIPT_DIR/datasets/cord.sh"
-source "$SCRIPT_DIR/datasets/tablebench.sh"
+
+# Wrapper function to handle directory changes around downloads
+download_with_dir_handling() {
+    local download_func=$1
+    echo "Running $download_func..."
+    $download_func
+    cd "$ORIGINAL_DIR" && cd "$SCRIPT_PARENT_DIR"
+}
+
+# Source dataset downloaders after utils and wrapper function are defined
+for dataset_script in "$SCRIPT_DIR"/datasets/*.sh; do
+    echo "Loading dataset script: $dataset_script"
+    source "$dataset_script"
+done
 
 # Create base data directories
 mkdir -p data/{rvl-cdip,publaynet,midv500,sroie,chartqa,plotqa,cord,tablebench}
@@ -96,18 +104,21 @@ setup_kaggle_auth
 
 echo "Starting downloads (will skip if datasets already exist)..."
 
-# Download datasets
-download_rvl_cdip
-download_publaynet
-download_midv500
-download_sroie
-download_chartqa
-download_plotqa
-download_cord
-download_tablebench
+# Download all datasets
+download_with_dir_handling download_rvl_cdip
+download_with_dir_handling download_publaynet
+download_with_dir_handling download_midv500
+download_with_dir_handling download_sroie
+download_with_dir_handling download_chartqa
+download_with_dir_handling download_plotqa
+download_with_dir_handling download_cord
+download_with_dir_handling download_tablebench
 
 echo "Done! Datasets have been downloaded and organized in the data directory."
 
 # Show the final directory structure
 echo "Dataset structure:"
-tree data -L 2 
+tree data -L 2
+
+# Return to original directory at the end
+cd "$ORIGINAL_DIR" 
