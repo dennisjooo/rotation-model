@@ -79,9 +79,9 @@ class DocRotationLightning(pl.LightningModule):
         self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         self.test_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         
-        # Add per-class accuracy tracking
+        # Add per-class accuracy tracking - using multiclass instead of binary
         self.val_accuracy_per_class = torch.nn.ModuleList([
-            Accuracy(task="binary") for _ in range(num_classes)
+            Accuracy(task="multiclass", num_classes=num_classes, average='none') for _ in range(num_classes)
         ])
         
         # Add angular error metric
@@ -130,18 +130,18 @@ class DocRotationLightning(pl.LightningModule):
         # 1. Classification loss with label smoothing
         cls_loss = F.cross_entropy(logits, y, label_smoothing=0.1)
         
-        # 2. Angular loss
-        angles_pred = pred * 45
-        angles_true = y * 45
+        # 2. Angular loss - ensure float type
+        angles_pred = pred.float() * 45
+        angles_true = y.float() * 45
         angular_diff = torch.abs(angles_pred - angles_true)
         angular_diff = torch.min(angular_diff, 360 - angular_diff)
-        angular_loss = angular_diff.float().mean()
+        angular_loss = angular_diff.mean()
         
         # 3. Enhanced confidence loss
         correct_mask = (pred == y)
         
         # Weight confidence loss based on angular difference
-        angular_weight = angular_diff.float() / 180.0  # Normalize to [0, 1]
+        angular_weight = angular_diff / 180.0  # Normalize to [0, 1]
         confidence_target = (1.0 - angular_weight) * correct_mask.float()
         
         confidence_loss = F.binary_cross_entropy_with_logits(
@@ -204,13 +204,16 @@ class DocRotationLightning(pl.LightningModule):
             if (~correct_mask).any():
                 self.val_confidence_incorrect(confidence_pred[~correct_mask].mean())
             
-            # Per-class accuracy
+            # Per-class accuracy - now handling multiclass format
             for i in range(8):
                 mask = y == i
                 if mask.any():
-                    self.val_accuracy_per_class[i](pred[mask], y[mask])
+                    class_acc = self.val_accuracy_per_class[i](pred[mask], y[mask])
+                    # Take the accuracy for the current class from the per-class metrics
+                    if isinstance(class_acc, torch.Tensor):
+                        class_acc = class_acc[i]
                     self.log(f"val/accuracy_{i*45}deg", 
-                            self.val_accuracy_per_class[i],
+                            class_acc,
                             on_epoch=True)
 
     def _shared_step(
