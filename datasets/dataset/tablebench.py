@@ -61,13 +61,13 @@ class TableBenchDataset(BaseDocumentDataset):
                 "Please run downloaders/download_datasets.sh first."
             )
         
-        # Find all PNG images in root directory
-        for img_path in self.root_dir.glob("*.png"):
+        # Find all JPG images in root directory
+        for img_path in self.root_dir.glob("*.jpg"):
             self._all_samples.append((img_path, 0))  # All documents are upright
         
         if not self._all_samples:
             raise RuntimeError(
-                f"No PNG images found in {self.root_dir}\n"
+                f"No JPG images found in {self.root_dir}\n"
                 "Please run downloaders/download_datasets.sh first."
             )
         
