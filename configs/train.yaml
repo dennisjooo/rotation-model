@@ -67,7 +67,7 @@ training:
 
 # Data configuration
 data:
-  batch_size: 128
+  batch_size: 256
   num_workers: 4
   image_size: 384
   persistent_workers: true
