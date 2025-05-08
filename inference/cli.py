@@ -43,9 +43,6 @@ def main():
     image = cv2.imread(args.image_path)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     
-    # Print the image size
-    print(f"Image size: {image_rgb.shape}")
-    
     # Run inference
     if args.patch_size is None:
         # Regular full-image inference
