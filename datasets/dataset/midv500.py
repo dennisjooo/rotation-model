@@ -1,40 +1,39 @@
-"""SROIE dataset implementation.
+"""MIDV-500 dataset implementation.
 
-The SROIE dataset contains receipt images with text annotations.
-For our rotation task, we use it without the OCR annotations, only for rotation prediction.
+The MIDV-500 dataset contains identity document images captured in various conditions.
+For our rotation task, we use it without the document type labels, only for rotation prediction.
 
 Reference:
-    Huang, Z., Chen, K., He, J., Bai, X., Karatzas, D., Lu, S., Jawahar, C.V.
-    "ICDAR2019 Competition on Scanned Receipt OCR and Information Extraction."
-    International Conference on Document Analysis and Recognition (ICDAR), 2019
+    Bulatov, K., Matalov, D., Arlazarov, V.V.
+    "MIDV-500: a dataset for identity document analysis and recognition on mobile devices in video stream."
+    Компьютерная оптика 44(5), 818-824 (2020)
 """
 
 import os
 from pathlib import Path
+from ..base import BaseDocumentDataset
 
-from .base import BaseDocumentDataset
 
-
-class SROIEDataset(BaseDocumentDataset):
-    """SROIE dataset for document rotation prediction.
+class MIDV500Dataset(BaseDocumentDataset):
+    """MIDV-500 dataset for document rotation prediction.
     
-    This implementation ignores the original OCR annotations and only
+    This implementation ignores the original document type labels and only
     uses the images for rotation prediction.
     
     The dataset structure after running download_datasets.sh:
-    data/sroie/
-        *.jpg    # All JPEG images directly in root directory
+    data/midv500/
+        *.tif    # All TIFF images directly in root directory
     """
     
     def __init__(
         self,
-        root_dir: str | Path = os.path.join(os.getcwd(), "data/sroie"),
+        root_dir: str | Path = os.path.join(os.getcwd(), "data/midv500"),
         split: str = "train",
         img_size: int = 384,
         val_split: float = 0.1,
         random_seed: int = 42,
     ) -> None:
-        """Initialize SROIE dataset.
+        """Initialize MIDV-500 dataset.
         
         Args:
             root_dir: Root directory containing the dataset
@@ -52,21 +51,21 @@ class SROIEDataset(BaseDocumentDataset):
         )
     
     def _load_dataset(self) -> None:
-        """Load SROIE dataset samples."""
+        """Load MIDV-500 dataset samples."""
         if not self.root_dir.exists():
             raise FileNotFoundError(
                 f"Dataset directory not found: {self.root_dir}\n"
                 "Please run downloaders/download_datasets.sh first."
             )
         
-        # Find all JPEG images in root directory
-        for img_path in self.root_dir.glob("*.jpg"):
+        # Find all TIFF images in root directory
+        for img_path in self.root_dir.glob("*.tif"):
             self._all_samples.append((img_path, 0))  # All documents are upright
         
         if not self._all_samples:
             raise RuntimeError(
-                f"No JPEG images found in {self.root_dir}\n"
+                f"No TIFF images found in {self.root_dir}\n"
                 "Please run downloaders/download_datasets.sh first."
             )
         
-        print(f"Loaded {len(self._all_samples)} images from SROIE dataset") 
+        print(f"Loaded {len(self._all_samples)} images from MIDV-500 dataset") 

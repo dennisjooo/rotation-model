@@ -59,7 +59,7 @@ model:
 # Training configuration
 training:
   max_epochs: 25
-  early_stop_patience: 15
+  early_stop_patience: 5
   gradient_clip_val: 1.0
   accumulate_grad_batches: 2
   val_check_interval: 1.0
@@ -72,14 +72,22 @@ data:
   image_size: 384
   persistent_workers: true
   prefetch_factor: 2
-  train_datasets:  # Use all datasets for training
-    - "rvl-cdip"     # Document classification dataset
-    - "publaynet"    # Scientific papers
-    - "midv500"      # ID documents
-    - "sroie"        # Receipts
-  val_datasets:  # Use all datasets for validation
+  train_datasets:  
+    - "rvl-cdip"     
+    - "publaynet"
+    - "midv500"      
+    - "sroie"
+    - "chartqa"      
+    - "plotqa"      
+    - "cord"         
+    - "tablebench"   
+  val_datasets:
     - "rvl-cdip"
     - "publaynet"
     - "midv500"
     - "sroie"
-  test_datasets: []  # No separate test set, using validation as hold-out
+    - "chartqa"      
+    - "plotqa"
+    - "cord"
+    - "tablebench"
+  test_datasets: []

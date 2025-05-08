@@ -10,15 +10,15 @@ and recognition on mobile devices in video stream. Компьютерная оп
 """
 
 from __future__ import annotations
+import concurrent.futures
 import ftplib
 import logging
 import os
+import zipfile
 from pathlib import Path
+from tqdm.auto import tqdm
 from typing import List, Optional
 from urllib.parse import urlparse
-import concurrent.futures
-import zipfile
-from tqdm.auto import tqdm
 
 # Setup logging
 logging.basicConfig(
@@ -248,6 +248,15 @@ dataset_links = [
     "ftp://smartengines.com/midv-500/dataset/09_chn_id.zip",      # Chinese ID
     "ftp://smartengines.com/midv-500/dataset/14_deu_id_new.zip",  # German ID (new)
     "ftp://smartengines.com/midv-500/dataset/20_esp_id_new.zip",  # Spanish ID (new)
+    "ftp://smartengines.com/midv-500/dataset/25_fin_id.zip",      # Finnish ID
+    "ftp://smartengines.com/midv-500/dataset/29_ita_id.zip",      # Italian ID
+    "ftp://smartengines.com/midv-500/dataset/32_lva_id.zip",      # Latvian ID
+    "ftp://smartengines.com/midv-500/dataset/35_pol_id.zip",      # Polish ID
+    "ftp://smartengines.com/midv-500/dataset/41_srb_id.zip",      # Serbian ID
+    "ftp://smartengines.com/midv-500/dataset/43_svk_id.zip",      # Slovak ID
+    "ftp://smartengines.com/midv-500/dataset/47_usa_id.zip",      # USA ID
+    "ftp://smartengines.com/midv-500/dataset/48_usa_id_new.zip",  # USA ID (new)
+    "ftp://smartengines.com/midv-500/dataset/49_rus_internalpassport.zip",  # Russian internal passport
     
     # International Passports
     "ftp://smartengines.com/midv-500/dataset/06_bra_passport.zip",     # Brazilian passport

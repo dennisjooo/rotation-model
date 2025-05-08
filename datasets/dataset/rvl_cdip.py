@@ -1,40 +1,39 @@
-"""MIDV-500 dataset implementation.
+"""RVL-CDIP dataset implementation.
 
-The MIDV-500 dataset contains identity document images captured in various conditions.
-For our rotation task, we use it without the document type labels, only for rotation prediction.
+The RVL-CDIP dataset contains 400,000 grayscale document images in 16 classes.
+For our rotation task, we use it without the class labels, only for rotation prediction.
 
 Reference:
-    Bulatov, K., Matalov, D., Arlazarov, V.V.
-    "MIDV-500: a dataset for identity document analysis and recognition on mobile devices in video stream."
-    Компьютерная оптика 44(5), 818-824 (2020)
+    Harley, Adam W., Alex Ufkes, and Konstantinos G. Derpanis.
+    "Evaluation of deep convolutional nets for document image classification and retrieval."
+    In ICDAR, 2015
 """
 
 import os
 from pathlib import Path
+from ..base import BaseDocumentDataset
 
-from .base import BaseDocumentDataset
 
-
-class MIDV500Dataset(BaseDocumentDataset):
-    """MIDV-500 dataset for document rotation prediction.
+class RVLCDIPDataset(BaseDocumentDataset):
+    """RVL-CDIP dataset for document rotation prediction.
     
-    This implementation ignores the original document type labels and only
+    This implementation ignores the original document class labels and only
     uses the images for rotation prediction.
     
     The dataset structure after running download_datasets.sh:
-    data/midv500/
+    data/rvl-cdip/
         *.tif    # All TIFF images directly in root directory
     """
     
     def __init__(
         self,
-        root_dir: str | Path = os.path.join(os.getcwd(), "data/midv500"),
+        root_dir: str | Path = os.path.join(os.getcwd(), "data/rvl-cdip"),
         split: str = "train",
         img_size: int = 384,
         val_split: float = 0.1,
         random_seed: int = 42,
     ) -> None:
-        """Initialize MIDV-500 dataset.
+        """Initialize RVL-CDIP dataset.
         
         Args:
             root_dir: Root directory containing the dataset
@@ -52,7 +51,10 @@ class MIDV500Dataset(BaseDocumentDataset):
         )
     
     def _load_dataset(self) -> None:
-        """Load MIDV-500 dataset samples."""
+        """Load RVL-CDIP dataset samples."""
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Looking for dataset in: {self.root_dir}")
+        
         if not self.root_dir.exists():
             raise FileNotFoundError(
                 f"Dataset directory not found: {self.root_dir}\n"
@@ -69,4 +71,4 @@ class MIDV500Dataset(BaseDocumentDataset):
                 "Please run downloaders/download_datasets.sh first."
             )
         
-        print(f"Loaded {len(self._all_samples)} images from MIDV-500 dataset") 
+        print(f"Loaded {len(self._all_samples)} images from RVL-CDIP dataset") 

@@ -6,7 +6,7 @@ A deep learning model for automatically detecting and correcting document orient
 
 - 🔄 8-class rotation detection (0° to 315° in 45° increments)
 - 📊 Confidence scoring for predictions
-- 🖼️ Support for various document types (IDs, receipts, scientific papers, etc.)
+- 🖼️ Support for various document types (IDs, receipts, scientific papers, charts, tables)
 - 🚀 Efficient MobileNetV3-small backbone
 - 🎯 Enhanced with CoordConv and CBAM attention mechanisms
 - ⚡ PyTorch Lightning training framework
@@ -26,12 +26,18 @@ The model combines several key components for robust document rotation detection
 
 ## Supported Datasets
 
-The model can be trained on multiple document datasets:
+The model supports training on multiple document datasets:
 
-1. **RVL-CDIP**: 400,000 grayscale document images in 16 classes
-2. **PubLayNet**: 360,000 scientific paper images with layout annotations
+1. **RVL-CDIP**: Document images in various categories
+2. **PubLayNet**: Scientific paper images with layout annotations
 3. **MIDV-500**: Identity document images in various capture conditions
 4. **SROIE**: Scanned receipt images with text annotations
+5. **ChartQA**: Chart and graph images
+6. **PlotQA**: Plot and visualization images
+7. **CORD**: Receipt OCR dataset
+8. **TableBench**: Table recognition dataset
+
+The datasets can be mixed and matched during training and validation using the dataloader configuration.
 
 ## Installation
 
@@ -68,6 +74,8 @@ Note: You'll need Kaggle API credentials (kaggle.json) for downloading some data
 ## Training
 
 1. Configure training parameters in `configs/train.yaml`
+   - Specify which datasets to use for training and validation
+   - Set batch size, image size, and other hyperparameters
 
 2. Start training:
 
@@ -90,3 +98,7 @@ This project uses the following datasets:
 - PubLayNet (Zhong et al., ICDAR 2019)
 - MIDV-500 (Bulatov et al., 2020)
 - SROIE (Huang et al., ICDAR 2019)
+- ChartQA (Chaudhry et al., 2023)
+- PlotQA (Methani et al., 2020)
+- CORD (Park et al., 2019)
+- TableBench (Various sources)

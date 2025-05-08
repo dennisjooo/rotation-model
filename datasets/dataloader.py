@@ -6,12 +6,7 @@ and testing, with proper dataset combinations, augmentations, and preprocessing.
 
 from typing import List, Optional, Tuple
 from torch.utils.data import DataLoader, ConcatDataset
-
-from .rvl_cdip import RVLCDIPDataset
-from .publaynet import PubLayNetDataset
-from .midv500 import MIDV500Dataset
-from .sroie import SROIEDataset
-
+from .dataset import *
 
 def get_dataset_class(name: str) -> type:
     """Get dataset class by name.
@@ -30,6 +25,10 @@ def get_dataset_class(name: str) -> type:
         "publaynet": PubLayNetDataset,
         "midv500": MIDV500Dataset,
         "sroie": SROIEDataset,
+        "chartqa": ChartQADataset,
+        "plotqa": PlotQADataset,
+        "cord": CORDDataset,
+        "tablebench": TableBenchDataset,
     }
     
     if name not in datasets:

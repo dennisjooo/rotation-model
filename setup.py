@@ -76,7 +76,7 @@ def create_callbacks(cfg: DictConfig) -> List[Callback]:
         ),
         LearningRateMonitor(logging_interval="step"),
         EarlyStopping(
-            monitor="val/accuracy_epoch",
+            monitor="val/accuracy",
             patience=cfg.training.early_stop_patience,
             mode="max",
             min_delta=0.001,
